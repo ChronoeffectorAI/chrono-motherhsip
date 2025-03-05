@@ -50,6 +50,130 @@ class Validator:
         quality_score = int(output_hash[:4], 16) / 65535
         return quality_score >= expected_quality
 
+class ChronoAgent:
+    """Base class for all Chrono Agents in the framework.
+    
+    All agents must inherit from this class and implement the required methods.
+    """
+    
+    def __init__(self, agent_id, capabilities=None):
+        """Initialize a ChronoAgent.
+        
+        Args:
+            agent_id (str): Unique identifier for this agent
+            capabilities (list, optional): List of capability strings this agent supports
+        """
+        self.agent_id = agent_id
+        self.capabilities = capabilities or []
+        self.status = "initialized"
+        self.last_execution = None
+        
+    def execute(self, context):
+        """Execute the agent's primary function.
+        
+        Args:
+            context (dict): Execution context with relevant data
+            
+        Returns:
+            dict: Result of the execution
+        """
+        raise NotImplementedError("All ChronoAgents must implement execute method")
+    
+    def validate(self):
+        """Validate that the agent meets all requirements.
+        
+        Returns:
+            bool: True if agent is valid, False otherwise
+        """
+        # Basic validation - can be extended by subclasses
+        return hasattr(self, 'agent_id') and hasattr(self, 'execute')
+
+# Add a proper agent registry
+class AgentRegistry:
+    """Registry to manage and verify all agents in the system."""
+    
+    def __init__(self):
+        self.agents = {}
+        self.verification_results = {}
+    
+    def register(self, agent):
+        """Register an agent with the system.
+        
+        Args:
+            agent (ChronoAgent): Agent instance to register
+            
+        Returns:
+            bool: True if registration successful
+        
+        Raises:
+            TypeError: If agent is not a ChronoAgent
+            ValueError: If agent_id already exists
+        """
+        if not isinstance(agent, ChronoAgent):
+            raise TypeError("Only ChronoAgent instances can be registered")
+            
+        if agent.agent_id in self.agents:
+            raise ValueError(f"Agent with ID {agent.agent_id} already registered")
+            
+        self.agents[agent.agent_id] = agent
+        self.verify_agent(agent.agent_id)
+        return True
+    
+    def get_agent(self, agent_id):
+        """Retrieve an agent by ID.
+        
+        Args:
+            agent_id (str): ID of the agent to retrieve
+            
+        Returns:
+            ChronoAgent: The requested agent
+            
+        Raises:
+            KeyError: If agent_id doesn't exist
+        """
+        if agent_id not in self.agents:
+            raise KeyError(f"No agent with ID {agent_id} found")
+        return self.agents[agent_id]
+    
+    def verify_agent(self, agent_id):
+        """Verify that an agent meets all requirements.
+        
+        Args:
+            agent_id (str): ID of the agent to verify
+            
+        Returns:
+            dict: Verification results
+        """
+        agent = self.get_agent(agent_id)
+        
+        # Basic verification
+        results = {
+            "is_valid_instance": isinstance(agent, ChronoAgent),
+            "has_execute_method": callable(getattr(agent, "execute", None)),
+            "self_validation": agent.validate(),
+        }
+        
+        results["passed"] = all(results.values())
+        self.verification_results[agent_id] = results
+        return results
+    
+    def list_agents(self, capability=None):
+        """List all registered agents, optionally filtered by capability.
+        
+        Args:
+            capability (str, optional): Filter agents by this capability
+            
+        Returns:
+            list: List of agent IDs
+        """
+        if capability is None:
+            return list(self.agents.keys())
+        
+        return [
+            agent_id for agent_id, agent in self.agents.items() 
+            if capability in agent.capabilities
+        ]
+
 class ChronoeffectorAI:
     def __init__(self):
         self.smart_contract = SolanaSmartContract()
